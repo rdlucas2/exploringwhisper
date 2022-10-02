@@ -2,10 +2,17 @@
 
 exploring openaiwhisper
 
+### working locally
+```
+pip install -r requirements.txt
+python app.py
+```
+
 ### build the container:
 ```
 docker build -t cliopenaiwhisper --target cli .
 
+#app mode won't work in a container currently - this could be useful if you use it to download files and transcribe them though
 docker build -t appopenaiwhisper --target app .
 ```
 

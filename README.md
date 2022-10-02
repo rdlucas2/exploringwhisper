@@ -1,6 +1,8 @@
 # openaiwhisper
 
-exploring openaiwhisper
+Exploring openaiwhisper.
+
+Models can be added to the models folder to be cached in the docker images, otherwise the model will be downloaded
 
 ### working locally
 ```

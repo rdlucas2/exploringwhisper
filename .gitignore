@@ -1,3 +1,4 @@
 output.wav
 .vscode
 __pycache__
+models/*

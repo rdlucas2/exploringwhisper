@@ -10,6 +10,7 @@ RUN apt-get install -y \
 RUN apt-get update
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+COPY ./models /root/.cache/whisper
 
 FROM base as cli
 COPY cli-requirements.txt cli-requirements.txt

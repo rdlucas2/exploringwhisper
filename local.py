@@ -29,13 +29,13 @@ class StateMachine:
         self.current_state.run()
 
 
-class Application(StateMachine):
+class Transcriber(StateMachine):
     def __init__(self):
         # Initial state
-        StateMachine.__init__(self, Application.waiting)
+        StateMachine.__init__(self, Transcriber.waiting)
 
 
-class UserAction:
+class ApplicationAction:
     def __init__(self, action):
         self.action = action
 
@@ -52,10 +52,33 @@ class UserAction:
         return hash(self.action)
 
 
-UserAction.waits = UserAction("Waiting")
-UserAction.starts_recording = UserAction("Recording started")
-UserAction.stops_recording = UserAction("Recording stopped")
-UserAction.quits = UserAction("Quitting application")
+class Transcriber(StateMachine):
+    def __init__(self):
+        # Initial state
+        StateMachine.__init__(self, Transcriber.waiting)
+
+
+class ApplicationAction:
+    def __init__(self, action):
+        self.action = action
+
+    def __str__(self):
+        return self.action
+
+    def __cmp__(self, other):
+        return cmp(self.action, other.action)
+
+    # Necessary when __cmp__ or __eq__ is defined
+    # in order to make this class usable as a
+    # dictionary key:
+    def __hash__(self):
+        return hash(self.action)
+
+
+ApplicationAction.waits = ApplicationAction("Waiting")
+ApplicationAction.starts_recording = ApplicationAction("Recording started")
+ApplicationAction.stops_recording = ApplicationAction("Recording stopped")
+ApplicationAction.quits = ApplicationAction("Quitting application")
 
 
 class Waiting(State):
@@ -65,14 +88,15 @@ class Waiting(State):
         print("Waiting for input...")
 
     def next(self, input):
-        if input == UserAction.starts_recording:
-            return Application.recording
-        if input == UserAction.quits:
-            return Application.quitting
-        return Application.waiting
+        if input == ApplicationAction.starts_recording:
+            return Transcriber.recording
+        if input == ApplicationAction.quits:
+            return Transcriber.quitting
+        return Transcriber.waiting
 
 
 q = queue.Queue()
+
 
 def callback(indata, frames, time, status):
     """This is called (from a separate thread) for each audio block."""
@@ -85,31 +109,31 @@ class Recording(State):
     name: str = "Recording"
 
     def run(self):
-        file_name = './files/output.wav'
+        file_name = "./files/output.wav"
 
         fs = 44100
         try:
             # Make sure the file is opened before recording anything:
-            with sf.SoundFile(file_name, mode='w', samplerate=fs,
-                            channels=2, subtype='PCM_24') as file:
+            with sf.SoundFile(
+                file_name, mode="w", samplerate=fs, channels=2, subtype="PCM_24"
+            ) as file:
                 with sd.InputStream(samplerate=fs, channels=2, callback=callback):
-                    print('#' * 10)
-                    print('press Ctrl+C to stop the recording')
-                    print('#' * 10)
+                    print("#" * 10)
+                    print("press Ctrl+C to stop the recording")
+                    print("#" * 10)
                     while True:
                         file.write(q.get())
         except KeyboardInterrupt:
-            print('\nRecording finished: ' + repr(file_name))
+            print("\nRecording finished: " + repr(file_name))
         except Exception as e:
-            print(type(e).__name__ + ': ' + str(e))
-
+            print(type(e).__name__ + ": " + str(e))
 
     def next(self, input):
-        if input == UserAction.stops_recording:
-            return Application.transcribing
-        if input == UserAction.quits:
-            return Application.quitting
-        return Application.recording
+        if input == ApplicationAction.stops_recording:
+            return Transcriber.transcribing
+        if input == ApplicationAction.quits:
+            return Transcriber.quitting
+        return Transcriber.recording
 
 
 class Transcribing(State):
@@ -117,14 +141,14 @@ class Transcribing(State):
 
     def run(self):
         start_time = time.time()
-        result = model.transcribe("./files/output.wav", language='en')
+        result = model.transcribe("./files/output.wav", language="en")
         print(result["text"])
         print("--- Transcription took: %s seconds ---" % (time.time() - start_time))
 
     def next(self, input):
-        if input == UserAction.quits:
-            return Application.quitting
-        return Application.waiting
+        if input == ApplicationAction.quits:
+            return Transcriber.quitting
+        return Transcriber.waiting
 
 
 class Quitting(State):
@@ -135,51 +159,48 @@ class Quitting(State):
         exit(0)
 
 
-Application.waiting = Waiting()
-Application.recording = Recording()
-Application.transcribing = Transcribing()
-Application.quitting = Quitting()
+Transcriber.waiting = Waiting()
+Transcriber.recording = Recording()
+Transcriber.transcribing = Transcribing()
+Transcriber.quitting = Quitting()
 
 
 def quit_or_wait(value):
     action = None
     if value == "quit":
-        action = UserAction.quits
+        action = ApplicationAction.quits
     else:
-        action = UserAction.waits
+        action = ApplicationAction.waits
     return action
 
 
-is_recording = False
-application = Application()
+transcriber = Transcriber()
 while 1:
     action = None
-    print(application.current_state.name)
+    print(transcriber.current_state.name)
 
-    if application.current_state.name == "Waiting":
+    if transcriber.current_state.name == "Waiting":
         value = input(
             "Hit enter to begin a recording, or type quit at any time to exit the program."
         )
         if value == "":
-            action = UserAction.starts_recording
-            is_recording = True
+            action = ApplicationAction.starts_recording
         else:
             action = quit_or_wait(value)
 
-    elif application.current_state.name == "Recording":
+    elif transcriber.current_state.name == "Recording":
         value = input(
             "Hit enter to use the current recording, or any other key and enter to record again."
         )
         if value == "":
-            action = UserAction.stops_recording
-            is_recording = False
+            action = ApplicationAction.stops_recording
         else:
             action = quit_or_wait(value)
 
-    elif application.current_state.name == "Transcribing":
-        action = UserAction.waits
+    elif transcriber.current_state.name == "Transcribing":
+        action = ApplicationAction.waits
 
-    elif application.current_state.name == "Quitting":
-        action = UserAction.quits
+    elif transcriber.current_state.name == "Quitting":
+        action = ApplicationAction.quits
 
-    application.run(action)
+    transcriber.run(action)

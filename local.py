@@ -1,8 +1,12 @@
-import whisper
+import queue
 import sounddevice as sd
-from scipy.io.wavfile import write
+import soundfile as sf
+import sys
+import time
+import whisper
 
 model = whisper.load_model("tiny")
+
 
 class State:
     name: str
@@ -23,6 +27,12 @@ class StateMachine:
         print(input)
         self.current_state = self.current_state.next(input)
         self.current_state.run()
+
+
+class Application(StateMachine):
+    def __init__(self):
+        # Initial state
+        StateMachine.__init__(self, Application.waiting)
 
 
 class UserAction:
@@ -62,15 +72,36 @@ class Waiting(State):
         return Application.waiting
 
 
+q = queue.Queue()
+
+def callback(indata, frames, time, status):
+    """This is called (from a separate thread) for each audio block."""
+    if status:
+        print(status, file=sys.stderr)
+    q.put(indata.copy())
+
+
 class Recording(State):
     name: str = "Recording"
 
     def run(self):
-        fs = 44100  # Sample rate
-        seconds = 3  # Duration of recording
-        myrecording = sd.rec(int(seconds * fs), samplerate=fs, channels=2)
-        sd.wait()  # Wait until recording is finished
-        write('./files/output.wav', fs, myrecording)  # Save as WAV file 
+        file_name = './files/output.wav'
+
+        fs = 44100
+        try:
+            # Make sure the file is opened before recording anything:
+            with sf.SoundFile(file_name, mode='w', samplerate=fs,
+                            channels=2, subtype='PCM_24') as file:
+                with sd.InputStream(samplerate=fs, channels=2, callback=callback):
+                    print('#' * 10)
+                    print('press Ctrl+C to stop the recording')
+                    print('#' * 10)
+                    while True:
+                        file.write(q.get())
+        except KeyboardInterrupt:
+            print('\nRecording finished: ' + repr(file_name))
+        except Exception as e:
+            print(type(e).__name__ + ': ' + str(e))
 
 
     def next(self, input):
@@ -85,8 +116,10 @@ class Transcribing(State):
     name: str = "Transcribing"
 
     def run(self):
+        start_time = time.time()
         result = model.transcribe("./files/output.wav")
-        print(result)
+        print(result["text"])
+        print("--- Transcription took: %s seconds ---" % (time.time() - start_time))
 
     def next(self, input):
         if input == UserAction.quits:
@@ -100,12 +133,6 @@ class Quitting(State):
     def run(self):
         print("Goodbye!")
         exit(0)
-
-
-class Application(StateMachine):
-    def __init__(self):
-        # Initial state
-        StateMachine.__init__(self, Application.waiting)
 
 
 Application.waiting = Waiting()
@@ -131,7 +158,7 @@ while 1:
 
     if application.current_state.name == "Waiting":
         value = input(
-            "Hit enter to begin a 3 second recording, or type quit at any time to exit the program."
+            "Hit enter to begin a recording, or type quit at any time to exit the program."
         )
         if value == "":
             action = UserAction.starts_recording
@@ -140,7 +167,9 @@ while 1:
             action = quit_or_wait(value)
 
     elif application.current_state.name == "Recording":
-        value = input("Hit enter to use the current recording, or any other key and enter to record again.")
+        value = input(
+            "Hit enter to use the current recording, or any other key and enter to record again."
+        )
         if value == "":
             action = UserAction.stops_recording
             is_recording = False

@@ -4,16 +4,6 @@ Exploring openaiwhisper.
 
 Models can be added to the models folder to be cached in the docker images, otherwise the model will be downloaded.
 
-### References:
-https://click.palletsprojects.com/en/8.1.x/
-https://www.geeksforgeeks.org/python-append-to-a-file/
-https://pysoundfile.readthedocs.io/en/latest/
-https://python-sounddevice.readthedocs.io/en/0.4.5/examples.html#recording-with-arbitrary-duration
-https://python-3-patterns-idioms-test.readthedocs.io/en/latest/StateMachine.html
-
-#### TODO:
-
-
 ### working locally
 ```
 pip install -r local-requirements.txt
@@ -40,3 +30,14 @@ docker run --rm -it -v "$(pwd)\files:/files" -v "$(pwd)\src:/src" --entrypoint /
 
 docker run --rm -it -v "$(pwd)\files:/files" -v "$(pwd)\src:/src" --entrypoint /bin/bash --name=appopenaiwhisper appopenaiwhisper
 ```
+
+#### TODO:
+- read audio from aws s3bucket or azure blob storage
+
+#### References:
+- https://github.com/openai/whisper
+- https://click.palletsprojects.com/en/8.1.x/
+- https://www.geeksforgeeks.org/python-append-to-a-file/
+- https://pysoundfile.readthedocs.io/en/latest/
+- https://python-sounddevice.readthedocs.io/en/0.4.5/examples.html#recording-with-arbitrary-duration
+- https://python-3-patterns-idioms-test.readthedocs.io/en/latest/StateMachine.html

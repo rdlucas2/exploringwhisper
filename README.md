@@ -2,7 +2,17 @@
 
 Exploring openaiwhisper.
 
-Models can be added to the models folder to be cached in the docker images, otherwise the model will be downloaded
+Models can be added to the models folder to be cached in the docker images, otherwise the model will be downloaded.
+
+### References:
+https://click.palletsprojects.com/en/8.1.x/
+https://www.geeksforgeeks.org/python-append-to-a-file/
+https://pysoundfile.readthedocs.io/en/latest/
+https://python-sounddevice.readthedocs.io/en/0.4.5/examples.html#recording-with-arbitrary-duration
+https://python-3-patterns-idioms-test.readthedocs.io/en/latest/StateMachine.html
+
+#### TODO:
+
 
 ### working locally
 ```

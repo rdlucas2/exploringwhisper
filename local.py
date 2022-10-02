@@ -5,7 +5,7 @@ import sys
 import time
 import whisper
 
-model = whisper.load_model("tiny")
+model = whisper.load_model("small.en")
 
 
 class State:
@@ -117,7 +117,7 @@ class Transcribing(State):
 
     def run(self):
         start_time = time.time()
-        result = model.transcribe("./files/output.wav")
+        result = model.transcribe("./files/output.wav", language='en')
         print(result["text"])
         print("--- Transcription took: %s seconds ---" % (time.time() - start_time))
 

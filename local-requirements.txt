@@ -1,2 +1,5 @@
 git+https://github.com/openai/whisper.git
 setuptools-rust
+pynput
+sounddevice
+scipy

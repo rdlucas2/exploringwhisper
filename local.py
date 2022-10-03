@@ -58,7 +58,7 @@ class Waiting(State):
 
     def run(self) -> ApplicationAction:
         value = input(
-            "Hit enter to begin a recording, or type quit at any time to exit the program."
+            "Hit enter to begin a recording, or type (q)uit at any time to exit the program."
         )
         if value == "":
             action = ApplicationAction.starts_recording
@@ -142,7 +142,7 @@ class Transcribing(State):
         result = self.model.transcribe(self.filepath, language=self.language)
         print(result["text"])
         print("--- Transcription took: %s seconds ---" % (time.time() - start_time))
-        return ApplicationAction.waiting
+        return ApplicationAction.waits
 
     def next(self, input):
         if input == ApplicationAction.quits:

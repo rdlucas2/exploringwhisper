@@ -1,6 +1,6 @@
+import click
 import time
 import whisper
-import click
 
 @click.command()
 @click.option('--filepath', prompt='Path to file to audio file', help='The path to the audio file to transcribe.')

@@ -1,11 +1,10 @@
+import click
 import queue
 import sounddevice as sd
 import soundfile as sf
 import sys
 import time
 import whisper
-
-model = whisper.load_model("small.en")
 
 
 class State:
@@ -21,12 +20,14 @@ class State:
 class StateMachine:
     def __init__(self, initial_state: State):
         self.current_state = initial_state
-        # self.current_state.run()
+        action = self.current_state.run()
+        self.run(action)
 
     def run(self, input):
         print(input)
         self.current_state = self.current_state.next(input)
-        self.current_state.run()
+        action = self.current_state.run()
+        self.run(action)
 
 
 class Transcriber(StateMachine):
@@ -73,19 +74,21 @@ class ApplicationAction:
     # dictionary key:
     def __hash__(self):
         return hash(self.action)
-
-
-ApplicationAction.waits = ApplicationAction("Waiting")
-ApplicationAction.starts_recording = ApplicationAction("Recording started")
-ApplicationAction.stops_recording = ApplicationAction("Recording stopped")
-ApplicationAction.quits = ApplicationAction("Quitting application")
 
 
 class Waiting(State):
     name: str = "Waiting"
 
-    def run(self):
-        print("Waiting for input...")
+    def run(self) -> ApplicationAction:
+        value = input(
+            "Hit enter to begin a recording, or type quit at any time to exit the program."
+        )
+        if value == "":
+            action = ApplicationAction.starts_recording
+        else:
+            action = quit_or_wait(value)
+
+        return action
 
     def next(self, input):
         if input == ApplicationAction.starts_recording:
@@ -95,38 +98,46 @@ class Waiting(State):
         return Transcriber.waiting
 
 
-q = queue.Queue()
-
-
-def callback(indata, frames, time, status):
-    """This is called (from a separate thread) for each audio block."""
-    if status:
-        print(status, file=sys.stderr)
-    q.put(indata.copy())
-
-
 class Recording(State):
     name: str = "Recording"
+    filepath: str
+    q: queue = queue.Queue()
 
-    def run(self):
-        file_name = "./files/output.wav"
+    def __init__(self, filepath="./files/output.wav"):
+        self.filepath = filepath
 
+    def callback(self, indata, frames, time, status):
+        """This is called (from a separate thread) for each audio block."""
+        if status:
+            print(status, file=sys.stderr)
+        self.q.put(indata.copy())
+
+    def run(self) -> ApplicationAction:
         fs = 44100
         try:
             # Make sure the file is opened before recording anything:
             with sf.SoundFile(
-                file_name, mode="w", samplerate=fs, channels=2, subtype="PCM_24"
+                self.filepath, mode="w", samplerate=fs, channels=2, subtype="PCM_24"
             ) as file:
-                with sd.InputStream(samplerate=fs, channels=2, callback=callback):
+                with sd.InputStream(samplerate=fs, channels=2, callback=self.callback):
                     print("#" * 10)
                     print("press Ctrl+C to stop the recording")
                     print("#" * 10)
                     while True:
-                        file.write(q.get())
+                        file.write(self.q.get())
         except KeyboardInterrupt:
-            print("\nRecording finished: " + repr(file_name))
+            print("\nRecording finished: " + repr(self.filepath))
         except Exception as e:
             print(type(e).__name__ + ": " + str(e))
+        finally:
+            value = input(
+                "Hit enter to use the current recording, or any other key and enter to record again."
+            )
+            if value == "":
+                action = ApplicationAction.stops_recording
+            else:
+                action = quit_or_wait(value)
+            return action
 
     def next(self, input):
         if input == ApplicationAction.stops_recording:
@@ -138,12 +149,23 @@ class Recording(State):
 
 class Transcribing(State):
     name: str = "Transcribing"
+    model: whisper
+    language: str
+    filepath: str
 
-    def run(self):
+    def __init__(
+        self, language="en", filepath="./files/output.wav", model="small.en"
+    ) -> None:
+        self.model = whisper.load_model("small.en")
+        self.language = language
+        self.filepath = filepath
+
+    def run(self) -> ApplicationAction:
         start_time = time.time()
-        result = model.transcribe("./files/output.wav", language="en")
+        result = self.model.transcribe(self.filepath, language=self.language)
         print(result["text"])
         print("--- Transcription took: %s seconds ---" % (time.time() - start_time))
+        return ApplicationAction.waiting
 
     def next(self, input):
         if input == ApplicationAction.quits:
@@ -159,48 +181,49 @@ class Quitting(State):
         exit(0)
 
 
-Transcriber.waiting = Waiting()
-Transcriber.recording = Recording()
-Transcriber.transcribing = Transcribing()
-Transcriber.quitting = Quitting()
-
-
 def quit_or_wait(value):
     action = None
     if value == "quit":
+        action = ApplicationAction.quits
+    elif value == "q":
         action = ApplicationAction.quits
     else:
         action = ApplicationAction.waits
     return action
 
 
-transcriber = Transcriber()
-while 1:
-    action = None
-    print(transcriber.current_state.name)
+@click.command()
+@click.option(
+    "--filepath",
+    default="./files/output.wav",
+    prompt="Path to file to audio file",
+    help="The path to the audio file to transcribe.",
+)
+@click.option(
+    "--model",
+    default="small.en",
+    prompt="Openai whisper model to use. See help for valid options.",
+    help='Defaults to tiny. Options are: tiny, base, small, medium, large. Add ".en" to any of these options for english only',
+)
+@click.option(
+    "--language",
+    default="en",
+    prompt="Language of the provided audio file.",
+    help="Defaults to English. Valid languages found here: https://github.com/openai/whisper/blob/main/whisper/tokenizer.py",
+)
+def run(filepath, model, language):
+    ApplicationAction.waits = ApplicationAction("Waiting")
+    ApplicationAction.starts_recording = ApplicationAction("Recording started")
+    ApplicationAction.stops_recording = ApplicationAction("Recording stopped")
+    ApplicationAction.quits = ApplicationAction("Quitting application")
+    Transcriber.waiting = Waiting()
+    Transcriber.recording = Recording(filepath=filepath)
+    Transcriber.transcribing = Transcribing(
+        language=language, filepath=filepath, model=model
+    )
+    Transcriber.quitting = Quitting()
 
-    if transcriber.current_state.name == "Waiting":
-        value = input(
-            "Hit enter to begin a recording, or type quit at any time to exit the program."
-        )
-        if value == "":
-            action = ApplicationAction.starts_recording
-        else:
-            action = quit_or_wait(value)
+    transcriber = Transcriber()
 
-    elif transcriber.current_state.name == "Recording":
-        value = input(
-            "Hit enter to use the current recording, or any other key and enter to record again."
-        )
-        if value == "":
-            action = ApplicationAction.stops_recording
-        else:
-            action = quit_or_wait(value)
-
-    elif transcriber.current_state.name == "Transcribing":
-        action = ApplicationAction.waits
-
-    elif transcriber.current_state.name == "Quitting":
-        action = ApplicationAction.quits
-
-    transcriber.run(action)
+if __name__ == "__main__":
+    run()

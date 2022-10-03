@@ -199,8 +199,7 @@ def run(filepath, model, language):
         language=language, filepath=filepath, model=model
     )
     Transcriber.quitting = Quitting()
-
-    transcriber = Transcriber()
+    Transcriber()
 
 
 if __name__ == "__main__":

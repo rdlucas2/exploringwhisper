@@ -79,9 +79,17 @@ class Recording(State):
     name: str = "Recording"
     filepath: str
     q: queue = queue.Queue()
+    audio_device = None
 
-    def __init__(self, filepath="./files/output.wav"):
+    def __init__(self, filepath="./files/output.wav", audio_device = None):
         self.filepath = filepath
+        print(audio_device)
+        if audio_device:
+            self.audio_device = audio_device
+            print(sd.default.device)
+            output_device = sd.default.device[1]
+            sd.default.device = [audio_device, output_device]
+            print(sd.default.device)
 
     def callback(self, indata, frames, time, status):
         """This is called (from a separate thread) for each audio block."""
@@ -89,14 +97,16 @@ class Recording(State):
             print(status, file=sys.stderr)
         self.q.put(indata.copy())
 
+
     def run(self) -> ApplicationAction:
         fs = 44100
+
         try:
             # Make sure the file is opened before recording anything:
             with sf.SoundFile(
-                self.filepath, mode="w", samplerate=fs, channels=2, subtype="PCM_24"
+                self.filepath, mode="w", samplerate=fs, channels=1, subtype="PCM_24"
             ) as file:
-                with sd.InputStream(samplerate=fs, channels=2, callback=self.callback):
+                with sd.InputStream(samplerate=fs, channels=1, callback=self.callback):
                     print("#" * 10)
                     print("press Ctrl+C to stop the recording")
                     print("#" * 10)
@@ -188,13 +198,19 @@ def quit_or_wait(value):
     prompt="Language of the provided audio file.",
     help="Defaults to English. Valid languages found here: https://github.com/openai/whisper/blob/main/whisper/tokenizer.py",
 )
-def run(filepath, model, language):
+@click.option(
+    '--audio_device',
+    default=9999,
+    prompt="Audio device index.",
+    help='Use command python -m sounddevice to discover options.'    
+)
+def run(filepath, model, language, audio_device):
     ApplicationAction.waits = ApplicationAction("Waiting")
     ApplicationAction.starts_recording = ApplicationAction("Recording started")
     ApplicationAction.stops_recording = ApplicationAction("Recording stopped")
     ApplicationAction.quits = ApplicationAction("Quitting application")
     Transcriber.waiting = Waiting()
-    Transcriber.recording = Recording(filepath=filepath)
+    Transcriber.recording = Recording(filepath=filepath, audio_device=None if audio_device == 9999 else audio_device)
     Transcriber.transcribing = Transcribing(
         language=language, filepath=filepath, model=model
     )

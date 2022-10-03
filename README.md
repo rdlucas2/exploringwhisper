@@ -3,6 +3,7 @@
 Exploring openaiwhisper.
 
 Models can be added to the models folder to be cached in the docker images, otherwise the model will be downloaded.
+To listen to audio from computer speakers, you must enable "stereo mix" on your recording devices, and then find it in the list of audio devices from the python -m sounddevice command.
 
 ### working locally
 ```

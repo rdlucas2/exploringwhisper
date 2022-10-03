@@ -53,29 +53,6 @@ class ApplicationAction:
         return hash(self.action)
 
 
-class Transcriber(StateMachine):
-    def __init__(self):
-        # Initial state
-        StateMachine.__init__(self, Transcriber.waiting)
-
-
-class ApplicationAction:
-    def __init__(self, action):
-        self.action = action
-
-    def __str__(self):
-        return self.action
-
-    def __cmp__(self, other):
-        return cmp(self.action, other.action)
-
-    # Necessary when __cmp__ or __eq__ is defined
-    # in order to make this class usable as a
-    # dictionary key:
-    def __hash__(self):
-        return hash(self.action)
-
-
 class Waiting(State):
     name: str = "Waiting"
 
@@ -224,6 +201,7 @@ def run(filepath, model, language):
     Transcriber.quitting = Quitting()
 
     transcriber = Transcriber()
+
 
 if __name__ == "__main__":
     run()
